@@ -1,0 +1,93 @@
+---
+title: "Homework 1"
+author: "Warren Kennedy"
+date: "2023-04-14"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(stargazer)
+setwd("C:/Users/oklah/OneDrive/Spring23/Econ 112/Homework 1")
+
+data.gdp=read.table("real_gdp_econ_112.csv",header=T, sep=",")
+data.cpi=read.table("CPI.csv",header=T, sep=",")
+data.gby=read.table("3-Month Interest Rate.csv",header=T, sep=",", na.strings = ".")
+data.uer=read.table("Unemployment Quarterly.csv",header=T, sep=",")
+
+```
+
+# **Country**: Portugal
+
+## Gross Domestic Product
+
+```{r, fig.align='center'}
+rgdp=ts(data.gdp[,2],start=1947,frequency=4)
+plot(rgdp, main="Quarterly GDP", xlab="Time", type = "l")
+summary(rgdp)
+```
+
+#### Annualized GPD Growth Rate
+
+```{r, fig.align='center'}
+dlogrgdp = 400*diff(log(rgdp))
+plot(dlogrgdp, main="Portugal GDP Growth",xlab="Time",type="l")
+summary(dlogrgdp)
+```
+
+## Consumer Price Index
+
+```{r, fig.align='center'}
+cpindex=ts(data.cpi[,2],start=1960,frequency=12)
+summary(cpindex)
+plot(cpindex, main="Consumer Price Index", xlab="Time", type = "l")
+```
+
+#### Annualized Quarterly CPI Inflation
+
+```{r, fig.align='center'}
+dlogcpi = 1200*diff(log(cpindex))
+plot(dlogcpi, main="Portugal CPI Inflation",xlab="Time",type="l")
+summary(dlogrgdp)
+```
+
+## Government Bond Yield
+
+```{r, fig.align='center'}
+gbyield=ts(data.gby[,2],start=1985,frequency=12)
+summary(gbyield)
+plot(gbyield, main="Government Bond Yield Portugal", xlab="Time", type = "l")
+```
+
+## Unemployment Rate
+
+```{r, fig.align='center'}
+urate=ts(data.uer[,2],start=1998,frequency=4)
+summary(urate)
+plot(urate, main="Monthly Unemployment Rate", xlab="Time", type = "l")
+
+```
+
+## Regression 1
+
+```{r, fig.align='center', results='asis'}
+dlogrgdp.NC=window(dlogrgdp,start=c(1998,1), end=c(2022,3))
+model1=lm(urate~dlogrgdp.NC)
+summary(model1)
+```
+
+## Regression 2
+
+```{r, fig.align='center', results='asis'}
+dlogcpi.NC=window(dlogcpi,start=c(1985,1), end=c(2022,7))
+model2= lm(gbyield~dlogcpi.NC)
+summary(model2)
+```
+
+# Analysis
+ 
+In our first regression, we are told that real GDP growth rate has a weakly inverse relationship with the unemployment rate. This finding is a reasonable conclusion considering what we know about their relationship outside of this data set: increased GDP is a reflection of an increase in production which will lead to an increase in demand for labor. In our second regression, we see a positive relationship between short term interest rates and the growth rate of inflation. Our OLS estimates for this result are statistically significant and reasonable considering what we know about the relationship between short term interest rates and inflation: that the fed will raise interest rates in response to high inflation, and lower them in a recession. 
+
+A problem that we see in our first regression is that we have a negative  adjusted R-squared value, indicating that the OLS model is a very poor fit to the data. We also have a high p-value making our estimate statistically insignificant. This makes sense when we look at our plots of GDP growth and unemployment rate, respectively, and see that neither of the plots are linear.  Similarly, the adjusted R-squared in our second regression, albeit positive, is very low, indicating a poor fit for the model. This is likely due to the linear model being a poor fit for the nonlinear data. 

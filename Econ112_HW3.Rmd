@@ -1,0 +1,346 @@
+---
+title: "Homework_3"
+author: "Warren Kennedy"
+date: "2023-05-16"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup,echo=FALSE,include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r,echo=FALSE,include=FALSE}
+
+setwd("C:/Users/oklah/OneDrive/Spring23/Econ 112/Homework")
+
+# INSTALL LIBRARIES-------------------------------------------------------------
+
+library(urca)
+library(mFilter)
+library(tseries)
+library(dyn)
+
+# LOAD DATA---------------------------------------------------------------------
+
+data.gdp=read.table("real_gdp_econ_112.csv",header=T, sep=",")
+data.cpi=read.table("CPI.csv",header=T, sep=",")
+data.gby=read.table("3-Month Interest Rate.csv",header=T, sep=",", na.strings = ".")
+data.uer=read.table("Unemployment Quarterly.csv",header=T, sep=",")
+
+```
+
+```{r,echo=FALSE,include=FALSE}
+# CREATE TIME SERIES------------------------------------------------------------
+
+# GDP
+
+rgdp=ts(data.gdp[,2],start=1947,frequency=4)
+dlogrgdp = 400*diff(log(rgdp))
+
+# CPI Inflation
+
+cpindex=ts(data.cpi[,2],start=1960,frequency=12)
+dlogcpi = 1200*diff(log(cpindex))
+
+# 3-Month Interest Rate
+data.3mir = na.omit(data.gby)
+gbyield=ts(data.3mir[,2],start=1985,frequency=12)
+
+# Unemployment Rate
+
+urate=ts(data.uer[,2],start=1998,frequency=4)
+
+```
+
+# QUESTION 1: Augmented Dickey-Fuller Test
+
+*Do you obtain evidence consistent with one or more stochastic trends being present in your data? Please explain*
+
+No, we do not. The null hypothesis of the ADF test is that our time series is non-stationary. If our p-value is statistically significant, it supports the alternative hypothesis of the data being stationary. The p-value associated with our ADF test is less than 0.01. Based on the information provided, with a Dickey-Fuller coefficient of -7.3805 and a p-value less than 0.01, there is strong evidence against the null hypothesis of a stochastic trend being present in the data. Instead, the data is consistent with the alternative hypothesis of being stationary, meaning it lacks a stochastic trend.
+
+```{r}
+adf.test(dlogrgdp)
+```
+
+# QUESTION 2: Phillips-Peron, KPSS, ERS Test
+
+*Are your results different when running the Phillips-Perron, KPSS, ERS compared to the ADF test?*
+
+## Phillips-Peron Test
+
+Similar to the ADF test, the Phillips-Perron test is testing against the null hypothesis that our time series is non-stationary. Based on the information provided, with a Dickey-Fuller Z(alpha) value of -275 and a p-value less than 0.01, we can again conclude that the data is consistent with the alternative hypothesis of being stationary. **This result matches our conclusion from our ADF test.**
+
+```{r}
+pp.test(dlogrgdp)
+```
+
+## KPSS Test
+
+Our KPSS test reports similar findings as the ADF test conducted in Question 1. Notwithstanding, it is important to note a key difference in the way that KPSS testing is conducted. Contrary to the ADF test, in KPSS, the null hypothesis assumes stationarity, while the alternative hypothesis assumes non-stationarity.  Therefore, a small p-value indicates evidence against the null hypothesis of stationarity. Based on the information provided, with a p-value of 0.04004, there is evidence against the null hypothesis of stationarity in the data. This suggests that the data may exhibit non-stationary behavior, indicating the presence of a stochastic trend. **This result is notably different than the conclusion reached using the ADF test.**
+```{r}
+kpss.test(dlogrgdp)
+```
+
+## ERS Test
+
+Based on the results from the ERS test, our test statistic of 0.1388 is smaller than all the critical values (1.99, 3.26, and 4.48). This suggests evidence against the null hypothesis of a stochastic trend. **This matches the conclusion from our ADF test that our data does not have a stochastic trend.** 
+
+```{r}
+ers.rgdp<-ur.ers(dlogrgdp,type = c("P-test"),model = c("constant"))
+summary(ers.rgdp)
+```
+
+# QUESTION 3: ADF/PP/KPSS/ERS on Unemployment, Inflation, and 3-Month Interest Data
+
+## Unemployment
+
+### ADF Test
+
+The ADF test returns a test statistic of -1.056 along with a p-value of 0.9254. Based on the information provided, there is insufficient evidence against the null hypothesis of stochastic trend in the data. We conclude that the **data does not provide strong support for the alternative hypothesis of stationarity.**
+
+```{r}
+adf.test(urate)
+
+```
+
+### Phillips-Perron Test
+
+The Phillips-Perron test retuns a Dickey-Fuller Z(alpha) value of -0.93464 and a p-value of 0.9871. Based on the information provided, there is insufficient evidence against the null hypothesis of a stochastic trend in the data. Similar to the results from our ADF test, we conclude that the **data does not provide strong support for the alternative hypothesis of stationarity.**
+
+```{r}
+pp.test(urate)
+```
+
+### KPSS Test
+
+The KPSS test returns a KPSS level value of 0.8525 and a p-value smaller than 0.01. Based on the information provided, there is evidence against the null hypothesis of stationarity in the data. **We conclude that the data may exhibit non-stationary behavior, potentially indicating the presence of a stochastic trend.**
+
+```{r}
+kpss.test(urate)
+```
+
+### ERS Test
+
+According to the ERS Test, our test statistic of 4.92 is larger than all the critical values (1.95, 3.11, and 4.17). This suggests evidence against the null hypothesis of non-stationarity in the data. **We conclude that our data may exhibit a stochastic trend.**
+
+```{r}
+ers.urate<-ur.ers(urate,type = c("P-test"),model = c("constant"))
+summary(ers.urate)
+```
+
+## Inflation
+
+### ADF Test 
+
+Based on the information provided, with a Dickey-Fuller coefficient of -4.7814 and a p-value smaller than 0.01, there is strong evidence against the null hypothesis of a stochastic trend in the data. **We conclude that the data provides support for the alternative hypothesis of stationarity. **
+
+```{r}
+adf.test(dlogcpi)
+```
+
+### Phillips-Perron Test
+
+Based on the information provided, with a Dickey-Fuller Z(alpha) value of -649.2 and a p-value smaller than 0.01, there is strong evidence against the null hypothesis of a stochastic trend in the data. **We conclude that the data provides support for the alternative hypothesis of stationarity.** 
+
+```{r}
+pp.test(dlogcpi)
+```
+### KPSS Test
+
+Based on the information provided, with a KPSS Level value of 3.3073 and a p-value smaller than 0.01, there is strong evidence against the null hypothesis of stationarity in the data. **We conclude that the data may exhibit non-stationary behavior, potentially indicating the presence of a stochastic trend.**
+
+```{r}
+kpss.test(dlogcpi)
+```
+
+### ERS Test
+
+Based on the provided critical values, a test statistic of 0.2397 is smaller than all the critical values (1.99, 3.26, and 4.48). This suggests evidence against the null hypothesis of a stochastic trend at a 5 percent level. **We conclude that our data may be stationary.**
+
+```{r}
+ers.logcpi<-ur.ers(dlogcpi,type = c("P-test"),model = c("constant"))
+summary(ers.logcpi)
+```
+
+## 3-Month Interest
+
+### ADF Test
+
+Based on the information provided, with a Dickey-Fuller coefficient of -1.19 and a p-value of 0.9077, there is not enough evidence to reject the null hypothesis of a stochastic trend in the data. **We conclude that the data does not provide enough evidence to reject the null hypothesis in support of the alternative hypothesis of stationarity.** 
+
+```{r}
+adf.test(gbyield)
+```
+
+### Phillips-Peron Test
+
+Based on the information provided, with a Dickey-Fuller Z(alpha) value of -4.7117 and a p-value of 0.8467, there is not enough evidence to reject the null hypothesis of a stochastic trend in the data. **We conclude that the data does not provide enough evidence to reject the null hypothesis in support of the alternative hypothesis of stationarity.** 
+
+```{r}
+pp.test(gbyield)
+```
+### KPSS Test
+
+Based on the information provided, with a KPSS Level value of 6.3024 and a p-value of 0.01, there is strong evidence against the null hypothesis of stationarity in the data. **We conclude that the data may exhibit non-stationary behavior, indicating the presence of a stochastic trend.**
+
+```{r}
+kpss.test(gbyield)
+```
+
+### ERS Test
+
+Based on the provided critical values, a test statistic of 159.0123 is much larger than all the critical values (1.99, 3.26, and 4.48). This suggests strong evidence against the null hypothesis of a stochastic trend. **We conclude that the data is likely stationary.**
+
+```{r}
+ers.gby<-ur.ers(gbyield,type = c("P-test"),model = c("constant"))
+summary(ers.gby)
+```
+
+# QUESTION 4: Use HP/BK/Hamilton Filter on Real GDP
+
+*Are there important differences in the estimated measures of cyclical fluctuations across the three filtering methods? Please explain*
+
+In this instance, all three methods seem to be picking up the same cyclical fluctuations, however, the Hamilton filter seems to characterize the cyclical shifts as occurring in higher magnitudes. See Below.
+
+## HP Filter
+
+```{r}
+
+#lambda is smoothing parameter
+
+rgdp.hp<-hpfilter(rgdp,freq=1600,type="lambda")
+
+#plot trend and cycles
+
+plot(rgdp.hp,lwd=2)
+
+```
+
+## Baxter-King Filter
+
+```{r}
+
+#pl and pu are the lower and upper band limit of the filter in quarters
+
+rgdp.bk<-bkfilter(rgdp,pl=6,pu=32)
+
+#plot trend and cycles
+
+plot(rgdp.bk,lwd=2)
+
+# HP and BK together
+
+plot(rgdp.hp$cycle,main="BK and HP filter of Real GDP",col=2)
+lines(rgdp.bk$cycle,col=1)
+```
+
+## Hamilton decomposition
+
+```{r}
+
+# h is horizon that defines trend in Hamilton filter
+
+h = 8 
+
+dy.HAM.1 <- dyn$lm(rgdp ~ lag(rgdp, -h)+lag(rgdp, -(h+1))+lag(rgdp, -(h+2))+lag(rgdp, -(h+3)))
+summary(dy.HAM.1)
+
+rgdp.HAM.trend<-fitted(dy.HAM.1)
+
+# note: need to set start 8 quarters later to match timing of cycle
+
+rgdp.HAM.trend<-ts(rgdp.HAM.trend,start=1950,frequency=4)
+
+plot(rgdp.HAM.trend,col="red",lwd=2)
+lines(rgdp,col="blue",lwd=2)
+
+rdgp.HAM.cycle = rgdp-rgdp.HAM.trend
+plot(rdgp.HAM.cycle,col="red",lwd=2)
+
+```
+
+ 
+
+```{r}
+
+#plot Ham, HP, BK Together
+
+plot(rdgp.HAM.cycle, col="black",lwd=2)
+lines(rgdp.bk$cycle,col="red",lwd=2)
+lines(rgdp.hp$cycle,col="blue",lwd=2)
+
+```
+
+# QUESTION 5: Use HP/BK/Hamilton Filter on Unemployment
+
+*Are there important differences in the estimated measures of cyclical fluctuations across the three filtering methods? Please explain*
+
+Similar to our filtering process on the Real GDP data, our three filters seem to pick up the same cycles, with our Hamilton feature recording the cyclical shifts as having a higher magnitude. Also, although all three of the filters seem to record a similar cyclical pattern, the Hamilton filter perceives the cycles as occurring mostly beneath our trend, while the other filters fluctuate around the trend line. See Below.
+
+## HP Filter
+
+```{r}
+
+#lambda is smoothing parameter
+
+urate.hp<-hpfilter(urate,freq=1600,type="lambda")
+
+#plot trend and cycles
+
+plot(urate.hp,lwd=2)
+```
+
+## Baxter-King Filter
+
+```{r}
+
+#pl and pu are the lower and upper band limit of the filter in quarters
+
+urate.bk<-bkfilter(urate,pl=6,pu=32)
+
+#plot trend and cycles
+
+plot(urate.bk,lwd=2)
+
+# HP and BK together
+
+plot(urate.hp$cycle,main="BK and HP filter of Unemployment",col=2)
+lines(urate.bk$cycle,col=1)
+```
+
+## Hamilton decomposition
+
+```{r}
+# h is horizon that defines trend in Hamilton filter
+
+h = 8 
+
+dy.HAM.2 <- dyn$lm(urate ~ lag(urate, -h)+lag(urate, -(h+1))+lag(urate, -(h+2))+lag(urate, -(h+3)))
+summary(dy.HAM.2)
+
+urate.HAM.trend<-fitted(dy.HAM.2)
+
+# note: need to set start 8 quarters later to match timing of cycle
+
+urate.HAM.trend<-ts(urate.HAM.trend,start=1998,frequency=4)
+
+plot(urate.HAM.trend,col="red",lwd=2)
+lines(urate,col="blue",lwd=2)
+
+urate.HAM.cycle = urate-urate.HAM.trend
+plot(urate.HAM.cycle,col="red",lwd=2)
+```
+
+
+
+
+```{r}
+#plot Ham, HP, BK Together
+
+plot(urate.HAM.cycle, col="black",lwd=2)
+lines(urate.bk$cycle,col="red",lwd=2)
+lines(urate.hp$cycle,col="blue",lwd=2)
+```
+

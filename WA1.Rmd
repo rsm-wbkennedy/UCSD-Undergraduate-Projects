@@ -1,0 +1,515 @@
+---
+title: "Writing Assignment 1"
+author: "Warren Kennedy"
+date: "2023-05-02"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+```{r, message=FALSE}
+# load all the libraries needed
+
+library(dyn)
+library(forecast)
+library(sandwich)
+library(lmtest)
+library(openxlsx)
+library(tseries)
+library(ggplot2)
+library(knitr)
+
+# load data into workspace
+
+data.cpi=read.table("CPI.csv",header=T, sep=",")
+data.uer=read.table("Unemployment Quarterly.csv",header=T, sep=",")
+
+```
+
+# Introduction
+
+ The following analysis focuses on exploring the Consumer Price Index (CPI) data spanning from 1960 to the present day, with the objective of studying the effects of fiscal and monetary policies on inflation. Our data includes monthly CPI measures, which are not seasonally adjusted. However, we have performed adjustments to produce a seasonally adjusted data set that is measured on a quarterly basis, ensuring its accuracy and reliability. Inflation is a crucial economic indicator that reflects the rate at which prices for goods and services increase over time. To study the effects of fiscal and monetary policies on inflation rates, CPI data is widely used because it provides an average measure of the price level of goods and services consumed by households. By comparing CPI data before and after changes in policies, we can analyze how these policies impact the inflation rate.
+  We are also seeking to measure the effects of fiscal and monetary policy on the unemployment rate. For this, we are using unemployment data for all persons in Portugal aged 15 to 64. The data we have chosen has already been measured quarterly, seasonally adjusted, and expressed as a percentage change, eliminating the need for additional alterations. Unemployment is an essential economic indicator that reflects the number of people actively seeking work but unable to find it. It provides a reliable way to gauge changes in the labor market over time and evaluate the overall health of the economy. By comparing unemployment data before and after changes in fiscal or monetary policy, we can observe the impact of these policies on the unemployment rate, offering valuable insights into their effects on the labor market.
+ 
+# Data
+
+We begin our analysis by presenting a comprehensive plot of the inflation growth rate covering the period from January 1960 to January 2023, which exhibits a cyclic pattern with persistent rates of increase and decrease. Notably, our data demonstrates a dramatic spike during the first 20 years of collection, as evident from the detailed summary presented below the plot. Although the average growth rate for inflation is approximately 7 percent, the median is around 4 percent, indicating the presence of outliers that drive up the average. These insightful findings from the plot and the summary statistics will aid us in selecting the most appropriate time series model that best captures the unique features of our data.
+ 
+  
+```{r}
+
+#CONSUMER PRICE INDEX
+
+#tell R data is time series
+
+cpindex=ts(data.cpi[,2],start=1960,frequency=12)
+
+
+# turn it into quarterly data
+
+cpiindex.q<- aggregate(cpindex, nfrequency = 4, FUN='mean')
+
+
+#compute annualized quarterly inflation rate
+
+Inflation = 100*diff(log(cpiindex.q), lag=4)
+
+#plot growth rate
+
+plot(Inflation, main="Portugal CPI Inflation",xlab="Time",type="l")
+
+#summary statistics
+
+summary(Inflation)
+
+#give data a more convenient notation
+
+y1 <- Inflation
+```
+  
+# Preferred Specification
+
+  The Box-Jenkins methodology is a powerful statistical technique used for modeling and forecasting time series data. It involves four main stages: Identification, estimation, diagnostic checking, and forecasting. Each stage is iterative, allowing for the model to be continually refined until an adequate model is achieved. During the identification stage, we use the autocorrelation (ACF) and partial autocorrelation (PACF) functions to determine the order of the ARMA model that best fits our data. This step is critical in selecting the optimal auto-regressive (AR) and moving average (MA) terms for our model. The estimation stage involves using maximum likelihood estimation to estimate the parameters of the ARIMA model. This step helps us to determine the AR and MA parameters that are most suitable for fitting our data. The diagnostic checking stage is essential to ensure that the residuals of the model are white noise, meaning that they exhibit no remaining patterns. This step helps to verify the accuracy and reliability of the model. Finally, the forecasting stage uses the estimated model to predict future values of the time series. The Box-Jenkins methodology provides a powerful tool for analyzing time series data, enabling accurate forecasting and providing valuable insights into complex data patterns.
+
+## Inflation Growth Rate Model
+
+  We will begin by selecting our preferred specifications for the model that describes the inflation growth rate, utilizing ACF and PACF visualizations to gain a better understanding of the patterns in our data. Autocorrelation measures the correlation between a time series and a lagged version of itself at different time lags. A plot of the autocorrelation function (ACF) shows the correlation between a time series and its lagged values over different lags. In contrast, partial autocorrelation measures the correlation between a time series and a lagged version of itself while controlling for the effect of intervening lags. Both ACF and PACF are instrumental in identifying the order of autoregressive (AR) and moving average (MA) models. Specifically, the ACF plot helps identify the order of the MA component, while the PACF plot helps identify the order of the AR component.
+  
+  
+```{r, echo=FALSE}
+acf(y1,main="Autocorrelation of Inflation, Portugal")
+
+pacf(y1,main="Partial Autocorrelation Inflation, Portugal")
+```
+Our ACF plot displays evidence of correlation between lagged periods, exhibiting a slow decay as we move further away from period 0. This slow decay suggests the possibility of an AR process, while the varying rate of correlation decay between periods could indicate another cyclical component or even an MA process. Our PACF plot presents challenges in interpretation due to the somewhat inconsistent nature of correlated periods. However, the peaks of positive correlation that seem to occur every four lags may indicate a yearly trend, given that our data is measured quarterly.
+  Ultimately, we can determine the likely combinations of AR and MA orders by testing our hypotheses using ARIMA. Employing these tools in selecting our preferred specifications for our model describing the inflation growth rate will enhance our understanding of the complex interplay of factors driving inflation.
+  To determine the order of our ARIMA model, we began by testing different combinations of AR and MA processes. We started with an AR process of order 1 and combined it with MA processes of orders 0 through 5. After comparing the likelihood of each specification and selecting a set of significant models, we continued to test increasing orders of AR models until we found the best fitting model for our data.
+  To compare the relative goodness-of-fit of different models, we used AIC and BIC measures. AIC measures the amount of information lost by the model given its complexity, with the goal of finding a model that fits the data well but is not too complex. BIC is similar to AIC but penalizes model complexity more heavily, with the goal of finding a model that fits the data well and is also as simple as possible. The model with the lowest AIC/BIC value is considered the best fitting model. We list the AIC and BIC values for our models in the table below.
+  
+```{r, message=FALSE}
+# STEP 2: ESTIMATION------------------------------------------------------------
+
+# compute estimates of models under considerations and AIC and BIC
+invisible(AR.1.MA.4.y1<-arima(y1,order=c(1,0,4)))
+invisible(coeftest(AR.1.MA.4.y1,vcv=NeweyWest))
+
+#Create a Table for Results
+
+models.y1 <- list(
+  AR1MA4 = arima(y1, order=c(1,0,4)),
+  AR1MA5 = arima(y1, order=c(1,0,5)),
+  AR2MA3 = arima(y1, order=c(2,0,3)),
+  AR2MA4 = arima(y1, order=c(2,0,4))
+)
+
+aics.y1 <- sapply(models.y1, AIC)
+bics.y1 <- sapply(models.y1, BIC)
+
+table.y1.aic <- data.frame(Model = names(models.y1), AIC = aics.y1)
+table.y1.bic <- data.frame(Model = names(models.y1), BIC = bics.y1)
+
+# Create table
+kable(table.y1.aic, caption = "AIC values for different models of Inflation") 
+kable(table.y1.bic, caption = "BIC values for different models of Inflation")
+```
+
+After measuring and comparing each of the selected models, we determined that the best fitting model for our data is a combination of an AR(1) process and an MA(4) process.
+
+The final step in our analysis is to perform a series of diagnostic checks on the chosen model to ensure its validity. Firstly, we check for stationarity, which is essential for our assumptions to hold. We verify that the roots of our model are both less than or equal to 1 in magnitude. This condition holds in our case, indicating that our model is stationary.
+Next, we conduct a residual analysis by plotting the residuals. Ideally, the residuals should be white noise with zero mean, constant variance, and no correlation between observations at different lags. If the residuals satisfy these conditions, we should see no visible patterns or trends in the plot, and the values should be evenly scattered around zero. Our residual plot appears to meet these criteria, thus passing our second test.
+```{r}
+#perform diagnostics of chosen model: ARMA(1,4) 
+
+AR.1.MA.4.eigen<-polyroot(c(-.69,.98, 1))
+#If the value of the roots is more than 1 then it is not stationary
+
+
+AR.1.MA.4.res<-residuals(AR.1.MA.4.y1)
+plot(AR.1.MA.4.res, main="Residuals of ARMA(1,4) Estimates", xlab="Time", type = "l", col="blue")
+
+```
+Our third test involves plotting an ACF of the residuals to check for significant autocorrelation that may remain after fitting the model. We observe two periods that break our confidence intervals, which could indicate some correlation, but overall, our model performs well on this test.
+```{r}
+acf(AR.1.MA.4.res, main="Autocorrelation of Residuals for ARMA(1,4)")
+
+```
+
+In the fourth test, we plot a histogram of the residuals to check for normal distribution. A significant deviation from normal distribution suggests that the model may not be appropriate. After running our diagnostic tests, we conclude that our model is a suitable fit for our data.
+```{r}
+# plot histogram of residuals and contrast with Gaussian distribution
+
+x1 <- AR.1.MA.4.res
+h1<-hist(x1, breaks=40, col="red", xlab="Inflation Fit Residuals", 
+        main="Histogram with Normal Curve") 
+x1fit<-seq(min(x1),max(x1),length=40) 
+y1fit<-dnorm(x1fit,mean=mean(x1),sd=sd(x1)) 
+y1fit <- y1fit*diff(h1$mids[1:2])*length(x1) 
+lines(x1fit, y1fit, col="blue", lwd=2)
+
+```
+
+We validate our conclusion by plotting the fitted values of the ARMA(1,4) model against the original data. This plot helps us visually assess the goodness of fit of the model. The red line representing the fitted values should closely follow the blue line representing the original data if the model fits well. Large discrepancies between the two lines indicate that the model may not be a good fit for the data. As we can see, our model provides a good trace of our data, confirming its suitability.
+```{r}
+# Plot Fitted Values
+AR.1.MA.4.fit<-fitted(AR.1.MA.4.y1)
+
+plot(y1, main="Fitted ARMA(1,4) Estimates", xlab="Time", type = "l", col="blue")
+lines(AR.1.MA.4.fit, col="red")
+
+```
+
+## Unemployment Growth Rate Model
+
+We are also attempting to model our unemployment data using the Box-Jenkins method. Like our approach with the inflation data, we start by examining a plot of the unemployment growth rates over time. However, our sample size for the unemployment data is relatively small, which means that our model may not be able to capture all the historical trends. 
+
+```{r}
+#UNEMPLOYMENT RATE
+
+#tell R data is time series
+
+urate=ts(data.uer[,2],start=1998,frequency=4)
+
+#plot data
+
+plot(urate, main="Monthly Unemployment Rate", xlab="Time", type = "l")
+
+#summary statistics
+
+summary(urate)
+
+#give data a more convenient notation
+
+y2 <- urate
+```
+
+ Upon analyzing the plot, we observe a persistent pattern in the growth rates, suggesting that the unemployment rate is relatively stable over time. However, there are few significant changes in the direction of growth, making it challenging to draw conclusions about the data based on the plot alone. Here we once again employ ACF and PACF visualizations to help guide us in selecting a model. 
+```{r}
+acf(y2,main="Autocorrelation of Unemployment, Portugal")
+
+pacf(y2,main="Partial Autocorrelation Unemployment, Portugal")
+
+```
+ 
+
+The ACF plot for the unemployment data reveals a gradual decay of correlation across lags, indicating an AR process as the likely model. Meanwhile, the PACF plot suggests direct correlation up to three periods away from lag zero, with three consecutive bars crossing the significance level lines. As a reminder, a bar in the PACF plot extending beyond the dashed lines implies statistical significance and the potential for direct correlation with the dependent variable. This valuable insight guides our choice of AR process order to test and ultimately select the best fitting model.
+
+We use the Box-Jenkins methodology to explore various combinations of AR, MA, and ARMA models to identify the best fit for our data. Based on the characteristics of our data, we believe that it is likely to be described by an AR process of order three. Therefore, we test models with varying AR and MA orders around this point to identify a set of models that have the potential to provide a good fit to our data. Next, we use AIC and BIC to compare and evaluate the performance of these models. The tables below show the AIC and BIC values for each model, and we select the model with the lowest value as the best fit. In this case, the ARMA(2,1) process is the model that satisfies this criterion.
+
+```{r}
+invisible(AR.2.MA.1.y2<-arima(y2,order=c(2,0,1)))
+invisible(coeftest(AR.2.MA.1.y2,vcv=NeweyWest))
+
+#Create a Table for Results
+
+models.y2 <- list(
+  AR2MA1 = arima(y2, order=c(2,0,1)),
+  AR2MA2 = arima(y2, order=c(2,0,2)),
+  AR3MA0 = arima(y2, order=c(3,0,0)),
+  AR3MA1 = arima(y2, order=c(3,0,1)),
+  AR3MA2 = arima(y2, order=c(3,0,2)),
+  AR4MA0 = arima(y2, order=c(4,0,0))
+)
+
+aics.y2 <- sapply(models.y2, AIC)
+bics.y2 <- sapply(models.y2, BIC)
+
+table.y2.aic <- data.frame(Model = names(models.y2), AIC = aics.y2)
+table.y2.bic <- data.frame(Model = names(models.y2), BIC = bics.y2)
+
+# Create table
+kable(table.y2.aic, caption = "AIC values for different models of Unemployment") 
+kable(table.y2.bic, caption = "BIC values for different models of Unemployment")
+```
+
+To ensure that our ARMA model is an appropriate fit, we perform several diagnostic checks. Firstly, we verify that our model is stationary as non-stationarity can result in biased parameter estimates and inaccurate forecasting. We check that the magnitude of the roots is less than one, which indicates stationarity, and our model satisfies this criterion. 
+
+Next, we examine the residuals of the model to ensure they are white noise. A good residual plot should show values scattered evenly around zero with no noticeable patterns or trends. Any discernible patterns or trends, such as a curved shape or repeating pattern, may indicate that the model fails to capture important features of the data. 
+
+```{r}
+#perform diagnostics of chosen model: ARMA(2,1) 
+
+AR.2.MA.1.eigen<-polyroot(c(-.89, -.67, 1))
+
+AR.2.MA.1.res<-residuals(AR.2.MA.1.y2)
+plot(AR.2.MA.1.res, main="Residuals of ARMA(2,1) Estimates", xlab="Time", type = "l", col="blue")
+summary(AR.2.MA.1.res)
+```
+
+We also use other diagnostic tools, such as the ACF and histogram of the residuals, to further examine whether the residuals are white noise. Significant autocorrelation remaining in the residuals after fitting the model, or deviation from a normal distribution, suggests that the model may not be appropriate. 
+
+```{r}
+#Check for auto correlation
+acf(AR.2.MA.1.res, main="Autocorrelation of Residuals for ARMA(2,1)")
+
+# plot histogram of residuals and contrast with Gaussian distribution
+
+x2 <- AR.2.MA.1.res
+h2<-hist(x2, breaks=40, col="red", xlab="Unemployment Fit Residuals", 
+         main="Histogram with Normal Curve") 
+x2fit<-seq(min(x2),max(x2),length=40) 
+y2fit<-dnorm(x2fit,mean=mean(x2),sd=sd(x2)) 
+y2fit <- y2fit*diff(h2$mids[1:2])*length(x2) 
+lines(x2fit, y2fit, col="blue", lwd=2)
+
+```
+In our case, the ACF plot of the residuals shows no violation of the hypothesis that the correlation between periods is zero, indicating no significant autocorrelation. Moreover, the histogram of the residuals suggests that they are normally distributed. These results lead us to conclude that our errors are indeed white noise and that our ARMA model is likely a good fit for the data.
+
+```{r}
+# Fit values of model
+AR.2.MA.1.fit<-fitted(AR.2.MA.1.y2)
+
+plot(y2, main="Fitted ARMA(2,1) Estimates", xlab="Time", type = "l", col="blue")
+lines(AR.2.MA.1.fit, col="red")
+
+```
+
+# Limitations
+
+While the Box-Jenkins approach is a popular method for modeling time series data, it does have some limitations that should be taken into consideration. One of the main limitations is the requirement of a sufficient amount of historical data to accurately estimate model parameters. With a small sample size, as seen in the unemployment data, the variability in the estimates is reduced, resulting in less accurate models. 
+
+Another limitation of the Box-Jenkins approach is the selection of the best model. The approach involves testing and selecting the best fitting model from a large set of possible models, and this process can be challenging, particularly if the most suitable model is not immediately apparent. This introduces uncertainty into the model selection process, making it less preferable when compared to other statistical approaches.
+
+Furthermore, the Box-Jenkins approach is sensitive to outliers, which can have a significant impact on model parameter estimates and forecasts. For instance, the pandemic shock in our inflation data required us to re-estimate our model, resulting in a different model choice. This sensitivity to outliers can pose a risk if outliers are present in the data, leading to poorly fitting models.
+
+Finally, the Box-Jenkins approach assumes that the errors in the model are white noise and have constant variance. If these assumptions do not hold, the models selected may not fit the data appropriately, leading to inaccurate forecasts. Despite these limitations, the Box-Jenkins approach remains a valuable tool for modeling time series data and should be used in conjunction with other methods for more robust analysis.
+# Appendix
+```{r}
+
+#_______________________________________________________________________________
+## LIMITATIONS: Data Excluding COVID -------------------------------------------
+#_______________________________________________________________________________
+
+# IINFLATION RATE (PRE-COVID)---------------------------------------------------
+
+# Create a new INFLATION time series w/o COVID
+inflation.precovid <- window(Inflation, end = c(2020, 1))
+
+#plot growth rate
+
+plot(inflation.precovid, main="Portugal CPI Inflation, Pre-Covid",xlab="Time",type="l")
+
+#summary statistics
+
+summary(inflation.precovid)
+
+#give data a more convenient notation
+
+y1.pc <- inflation.precovid
+
+# STEP 1: IDENTIFICATION--------------------------------------------------------
+
+#plot data, ACF and PACF to get an idea of model class
+
+plot(y1.pc, main="Portugal CPI Inflation, Quarterly, Pre-Covid ", xlab="Time", type = "l")
+
+acf(y1.pc,main="Autocorrelation of Inflation, Pre-Covid ")
+
+pacf(y1.pc,main="Partial Autocorrelation Inflation, Pre-Covid ")
+
+# STEP 2: ESTIMATION------------------------------------------------------------
+
+# compute estimates of models under considerations and AIC and BIC
+
+#Coefficient Test
+
+AR.1.MA.4.y1.pc<-arima(y1.pc,order=c(1,0,4))
+coeftest(AR.1.MA.4.y1.pc,vcv=NeweyWest)
+
+AR.1.MA.5.y1.pc<-arima(y1.pc,order=c(1,0,5))
+coeftest(AR.1.MA.5.y1.pc,vcv=NeweyWest)
+
+AR.2.MA.3.y1.pc<-arima(y1.pc,order=c(2,0,3))
+coeftest(AR.2.MA.3.y1.pc,vcv=NeweyWest)
+
+AR.2.MA.4.y1.pc<-arima(y1.pc,order=c(2,0,4))
+coeftest(AR.2.MA.4.y1.pc,vcv=NeweyWest)
+
+AIC(AR.1.MA.4.y1.pc,AR.1.MA.5.y1.pc,AR.2.MA.3.y1.pc,AR.2.MA.4.y1.pc)
+BIC(AR.1.MA.4.y1.pc,AR.1.MA.5.y1.pc,AR.2.MA.3.y1.pc,AR.2.MA.4.y1.pc)
+
+#Create a Table for Results
+
+models.y1.pc <- list(
+  AR1MA4 = arima(y1.pc, order=c(1,0,4)),
+  AR1MA5 = arima(y1.pc, order=c(1,0,5)),
+  AR2MA3 = arima(y1.pc, order=c(2,0,3)),
+  AR2MA4 = arima(y1.pc, order=c(2,0,4))
+)
+
+aics.y1.pc <- sapply(models.y1.pc, AIC)
+bics.y1.pc <- sapply(models.y1.pc, BIC)
+
+table.y1.pc.aic <- data.frame(Model = names(models.y1.pc), AIC = aics.y1.pc)
+table.y1.pc.bic <- data.frame(Model = names(models.y1.pc), BIC = bics.y1.pc)
+
+# STEP 3: DIAGNOSTIC CHECKING---------------------------------------------------
+
+#perform diagnostics of chosen model: ARMA(2,4) 
+
+AR.2.MA.4.eigen<-polyroot(c(-.67,.21, 1))
+#If the value of the roots is more than 1 then it is not stationary
+
+
+AR.2.MA.4.res<-residuals(AR.2.MA.4.y1.pc)
+plot(AR.2.MA.4.res, main="Residuals of ARMA(2,4) Estimates", xlab="Time", type = "l", col="blue")
+
+acf(AR.2.MA.4.res, main="Autocorrelation of Residuals for ARMA(2,4)")
+
+AR.2.MA.4.fit<-fitted(AR.2.MA.4.y1.pc)
+
+plot(y1.pc, main="Fitted ARMA(2,4) Estimates", xlab="Time", type = "l", col="blue")
+lines(AR.2.MA.4.fit, col="red")
+
+
+# plot histogram of residuals and contrast with Gaussian distribution
+
+x1.pc <- AR.1.MA.4.res
+h1.pc<-hist(x1.pc, breaks=40, col="red", xlab="Inflation Fit Residuals", 
+         main="Histogram with Normal Curve") 
+x1fit.pc<-seq(min(x1.pc),max(x1.pc),length=40) 
+y1fit.pc<-dnorm(x1fit.pc,mean=mean(x1.pc),sd=sd(x1.pc)) 
+y1fit.pc <- y1fit.pc*diff(h1.pc$mids[1:2])*length(x1) 
+lines(x1fit.pc, y1fit.pc, col="blue", lwd=2)
+
+# forecast using the preferred model
+
+plot(forecast(AR.2.MA.4.y1.pc,h=100))
+
+
+# UNEMPLOYMENT RATE (PRE-COVID) ------------------------------------------------
+
+# Create a new UNEMPLOYMENT time series w/o COVID
+urate.precovid <- window(urate,  end = c(2020, 1))
+
+#plot data
+
+plot(urate.precovid, main="Quarterly Unemployment Rate, Pre-Covid", xlab="Time", type = "l")
+
+#summary statistics
+
+summary(urate.precovid)
+
+#give data a more convenient notation
+
+y2.pc <- urate.precovid
+
+# STEP 1: IDENTIFICATION--------------------------------------------------------
+
+#plot data, ACF and PACF to get an idea of model class
+
+plot(y2.pc, main="Portugal Unemployment Rate, Quarterly, Pre-Covid", xlab="Time", type = "l")
+
+acf(y2.pc,main="Autocorrelation of Unemployment, Pre-Covid ")
+
+pacf(y2.pc,main="Partial Autocorrelation Unemployment, Pre-Covid ")
+
+# STEP 2: ESTIMATION------------------------------------------------------------
+
+# compute estimates of models under considerations and AIC and BIC
+
+#Coefficient Test
+
+AR.1.MA.2.y2.pc<-arima(y2.pc,order=c(1,0,2))
+coeftest(AR.1.MA.2.y2.pc,vcv=NeweyWest)
+
+AR.1.MA.3.y2.pc<-arima(y2.pc,order=c(1,0,3))
+coeftest(AR.1.MA.3.y2.pc,vcv=NeweyWest)
+
+AR.1.MA.4.y2.pc<-arima(y2.pc,order=c(1,0,4))
+coeftest(AR.1.MA.4.y2.pc,vcv=NeweyWest)
+
+AR.2.MA.0.y2.pc<-arima(y2.pc,order=c(2,0,0))
+coeftest(AR.2.MA.0.y2.pc,vcv=NeweyWest)
+
+AR.2.MA.1.y2.pc<-arima(y2.pc,order=c(2,0,1))
+coeftest(AR.2.MA.1.y2.pc,vcv=NeweyWest)
+
+AR.3.MA.0.y2.pc<-arima(y2.pc,order=c(3,0,0))
+coeftest(AR.3.MA.0.y2.pc,vcv=NeweyWest)
+
+AIC(AR.1.MA.2.y2.pc,AR.1.MA.3.y2.pc,AR.1.MA.4.y2.pc,AR.2.MA.0.y2.pc,AR.2.MA.1.y2.pc,AR.3.MA.0.y2.pc)
+BIC(AR.1.MA.2.y2.pc,AR.1.MA.3.y2.pc,AR.1.MA.4.y2.pc,AR.2.MA.0.y2.pc,AR.2.MA.1.y2.pc,AR.3.MA.0.y2.pc)
+
+#Create a Table for Results
+
+models.y2.pc <- list(
+  AR1MA2 = arima(y2.pc, order=c(1,0,2)),
+  AR1MA3 = arima(y2.pc, order=c(1,0,3)),
+  AR1MA4 = arima(y2.pc, order=c(1,0,4)),
+  AR2MA0 = arima(y2.pc, order=c(2,0,0)),
+  AR2MA1 = arima(y2.pc, order=c(2,0,1)),
+  AR3MA0 = arima(y2.pc, order=c(3,0,0))
+)
+
+aics.y2.pc <- sapply(models.y2.pc, AIC)
+bics.y2.pc <- sapply(models.y2.pc, BIC)
+
+table.y2.pc.aic <- data.frame(Model = names(models.y2.pc), AIC = aics.y2.pc)
+table.y2.pc.bic <- data.frame(Model = names(models.y2.pc), BIC = bics.y2.pc)
+
+# STEP 3: DIAGNOSTIC CHECKING---------------------------------------------------
+
+#perform diagnostics of chosen model: ARMA(2,1) 
+
+AR.2.MA.1.eigen.pc<-polyroot(c(-.84, -.49, 1))
+
+AR.2.MA.1.res.pc<-residuals(AR.2.MA.1.y2.pc)
+plot(AR.2.MA.1.res.pc, main="Residuals of ARMA(2,1) Pre-Covid Estimates", xlab="Time", type = "l", col="blue")
+
+acf(AR.2.MA.1.res.pc, main="Autocorrelation of Residuals for ARMA(2,1), Pre-Covid")
+
+AR.2.MA.1.fit.pc<-fitted(AR.2.MA.1.y2.pc)
+
+plot(y2.pc, main="Fitted ARMA(2,1) Estimates, Pre-Covid", xlab="Time", type = "l", col="blue")
+lines(AR.2.MA.1.fit.pc, col="red")
+
+
+# plot histogram of residuals and contrast with Gaussian distribution
+
+x2.pc <- AR.2.MA.1.res.pc
+h2.pc<-hist(x2.pc, breaks=40, col="red", xlab="Unemployment Fit Residuals", 
+         main="Histogram with Normal Curve, Pre-Covid") 
+x2fit.pc<-seq(min(x2.pc),max(x2.pc),length=40) 
+y2fit.pc<-dnorm(x2fit.pc,mean=mean(x2.pc),sd=sd(x2.pc)) 
+y2fit.pc <- y2fit.pc*diff(h2.pc$mids[1:2])*length(x2.pc) 
+lines(x2fit.pc, y2fit.pc, col="blue", lwd=2)
+
+# forecast using the preferred model
+
+plot(forecast(AR.2.MA.1.y2.pc,h=100))
+
+
+#_______________________________________________________________________________
+## LIMITATIONS: CPI Data Excluding first 10 years-------------------------------
+#_______________________________________________________________________________
+
+# Create a new time series object with the desired window
+Inflation.alt <- window(Inflation, start = c(1970, 1))
+
+#plot growth rate
+
+plot(Inflation.alt, main="Portugal CPI Inflation since 1970",xlab="Time",type="l")
+
+#summary statistics
+
+summary(Inflation.alt)
+
+#give data a more convenient notation
+
+y1.alt <- Inflation.alt
+
+# STEP 1: IDENTIFICATION--------------------------------------------------------
+
+#plot data, ACF and PACF to get an idea of model class
+
+plot(y1.alt, main="Portugal CPI Inflation since 1970, Quarterly", xlab="Time", type = "l")
+
+acf(y1.alt,main="Autocorrelation of Inflation since 1970, Portugal")
+
+pacf(y1.alt,main="Partial Autocorrelation Inflation since 1970, Portugal")
+
+```
+
